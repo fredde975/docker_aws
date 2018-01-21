@@ -1,0 +1,7 @@
+aws --profile op rds create-db-instance --engine postgres \
+--no-multi-az --no-publicly-accessible \
+--vpc-security-group-ids sg-bf4748c4 \
+--db-instance-class db.t2.micro --allocated-storage 20 \
+--db-instance-identifier dockerzon-production \
+--db-name dockerzon_production --master-username dockerzon \
+--master-user-password intergalacticzebramoldfactory

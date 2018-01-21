@@ -1,0 +1,1816 @@
+Resources:
+"GroupId": "sg-bf4748c4"
+Postgres pwd: intergalacticzebramoldfactory
+Postgress endpoint": "dockerzon-production.cbjor7hidfop.eu-west-1.rds.amazonaws.com"
+redis endpoint: dockerzon-production.az5tzi.0001.euw1.cache.amazonaws.com
+ELB DNS:              "DNSName": "dockerzon-web-803630894.eu-west-1.elb.amazonaws.com"
+
+
+
+Frågor:
+1. I compose sätter man upp sina services/images (postgres, redis, dockerzon, sidekiq)  ska ha sina portar, volymer och nätverk.
+Hur får man sedan att dem att exekvera i olika miljöer? Tex i produktion ska postgres och redis gå mot resurser i AWS.
+
+2.
+
+
+Private Docker Registry (ECR)
+================================
+Authenticate your Docker client to Amazon ECR
+aws ecr get-login
+● Copy/paste the output into a terminal to authenticate yourself for 12 hours
+● Make a note of your registry URL for later
+Create a new repository
+aws ecr create-repository --repository-name deepdive/nginx
+Describe all repositories
+aws ecr describe-repositories
+List all images in the deepdive/nginx repository
+aws ecr list-images --repository-name deepdive/nginx
+Pull down the nginx image so we can push it later
+docker pull nginx:1.9
+Tag the nginx image
+docker tag nginx:1.9 xxx.dkr.ecr.us-east-1.amazonaws.com/deepdive/nginx:1.9
+● Replace my AccountId (xxx) with yours
+Push the nginx image to your repository
+docker push xxx.dkr.ecr.us-east-1.amazonaws.com/deepdive/nginx
+● Replace my AccountId (xxx) with yours
+Edit the task definition file with your registry's URL
+# Follow along with the video
+Re­register the task definition that you edited
+# Make sure you're in the deepdive/ folder when executing this command
+aws ecs register-task-definition --cli-input-json \
+file://web-task-definition.json
+Run the new task definition
+# Make sure you're in the deepdive/ folder when executing this command
+aws ecs run-task --cluster deepdive --task-definition web --count 1
+Check it out in your browser
+# Follow along with the video
+
+
+
+Bygger och kör vår egendefinierade Nginex image
+=======================================
+$ docker build -t dockerzon_nginx .
+Sending build context to Docker daemon  11.26kB
+Step 1/9 : FROM nginx:1.9
+ ---> c8c29d842c09
+Step 2/9 : MAINTAINER Nick Janetakis <nick.janetakis@gmail.com>
+ ---> Using cache
+ ---> cc0a80b0648d
+Step 3/9 : RUN apt-get update && apt-get install -y --no-install-recommends curl       && rm -rf /var/lib/apt/lists/*
+ ---> Using cache
+ ---> 895afde79365
+Step 4/9 : RUN rm /usr/share/nginx/html/*
+ ---> Using cache
+ ---> 2731bdc2cfdd
+Step 5/9 : COPY configs/nginx.conf /etc/nginx/nginx.conf
+ ---> Using cache
+ ---> d48b1d86f667
+Step 6/9 : COPY configs/default.conf /etc/nginx/conf.d/default.conf
+ ---> Using cache
+ ---> 3397db76725c
+Step 7/9 : COPY docker-entrypoint.sh /
+ ---> Using cache
+ ---> 3938f55aa09f
+Step 8/9 : ENTRYPOINT /docker-entrypoint.sh
+ ---> Using cache
+ ---> afc3825d00e3
+Step 9/9 : CMD nginx -g daemon off;
+ ---> Using cache
+ ---> d38109969293
+Successfully built d38109969293
+Successfully tagged dockerzon_nginx:latest
+fredrik@Fredriks-MBP-2 ~/Documents/docker_on_aws_udemy/nginx
+
+
+$ docker run  --rm -p 80:80 --net dockerzon_default dockerzon_nginx
+
+
+Vill man testa local ändrar man följande rader i docker-entrypoint.sh
+====================================================================
+
+PLACEHOLDER_VHOST="localhost"
+#PLACEHOLDER_VHOST_OLD="$(curl http://169.254.169.254/latest/meta-data/public-hostname)"
+
+
+Starta dockerzon med:
+docker-compose up -d
+
+
+
+aws --profil op ec2 create-key-pair --key-name aws-fredrik-op --query $ aws --profil op ec2 create-key-pair --key-name aws-fredrik-op --query 'KeyMaterial' --output text > ~/.ssh/aws-fredrik-op.pem
+
+aws --profile op ec2 describe-key-pairs --key-name aws-fredrik-op
+
+aws --profile op ec2 create-security-group --group-name fredrik_SG_euwest1 --description "Security Group for Fredrik on eu-west-1"
+"GroupId": "sg-bf4748c4"
+
+aws --profile op ec2 authorize-security-group-ingress --group-id sg-bf4748c4 --protocol tcp --port 22 --cidr 0.0.0.0/0
+
+aws --profile op ec2 describe-security-groups --group-ids sg-bf4748c4
+
+aws --profile op ec2 authorize-security-group-ingress --group-id sg-bf4748c4 --protocol tcp --port 5432 --cidr 0.0.0.0/0 --source-group sg-bf4748c4
+$ aws --profile op ec2 authorize-security-group-ingress --group-id sg-bf4748c4 --protocol tcp --port 22 --cidr 0.0.0.0/0
+$ aws --profile op ec2 authorize-security-group-ingress --group-id sg-bf4748c4 --protocol tcp --port 80 --cidr 0.0.0.0/0
+$ aws --profile op ec2 authorize-security-group-ingress --group-id sg-bf4748c4 --protocol tcp --port 6379 --cidr 0.0.0.0/0 --source-group sg-bf4748c4
+
+
+aws --profile op ecs create-cluster  --cluster-name deepdive
+{
+    "cluster": {
+        "status": "ACTIVE",
+        "clusterName": "deepdive",
+        "registeredContainerInstancesCount": 0,
+        "pendingTasksCount": 0,
+        "runningTasksCount": 0,
+        "activeServicesCount": 0,
+        "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive"
+    }
+}
+
+ aws --profile op ecs list-clusters
+{
+    "clusterArns": [
+        "arn:aws:ecs:eu-west-1:000986988155:cluster/default",
+        "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+        "arn:aws:ecs:eu-west-1:000986988155:cluster/microgw"
+    ]
+}
+
+fredrik@Fredriks-MBP-2 ~/Documents/docker_on_aws_udemy
+$ aws --profile op ecs describe-clusters --clusters deepdive
+{
+    "clusters": [
+        {
+            "status": "ACTIVE",
+            "clusterName": "deepdive",
+            "registeredContainerInstancesCount": 0,
+            "pendingTasksCount": 0,
+            "runningTasksCount": 0,
+            "activeServicesCount": 0,
+            "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive"
+        }
+    ],
+    "failures": []
+}
+
+aws --profile op  s3api create-bucket --bucket fredrik-deepdive
+{
+    "Location": "/fredrik-deepdive"
+}
+
+$ aws --profile op ec2 run-instances --image-id ami-acb020d5 --count 1 \
+> --instance-type t2.micro --iam-instance-profile Name=ecsInstanceRole \
+> --key-name aws-fredrik-op --security-group-ids sg-bf4748c4 --user-data file://copy-ecs-config-to-s3
+{
+    "OwnerId": "000986988155",
+    "ReservationId": "r-09c2a25d31bfead5f",
+    "Groups": [],
+    "Instances": [
+        {
+            "Monitoring": {
+                "State": "disabled"
+            },
+            "PublicDnsName": "",
+            "RootDeviceType": "ebs",
+            "State": {
+                "Code": 0,
+                "Name": "pending"
+            },
+            "EbsOptimized": false,
+            "LaunchTime": "2018-01-10T16:10:58.000Z",
+            "PrivateIpAddress": "172.31.18.164",
+            "ProductCodes": [],
+            "VpcId": "vpc-7fb2741b",
+            "StateTransitionReason": "",
+            "InstanceId": "i-0618e7d71f44d6ec7",
+            "ImageId": "ami-acb020d5",
+            "PrivateDnsName": "ip-172-31-18-164.eu-west-1.compute.internal",
+            "KeyName": "aws-fredrik-op",
+            "SecurityGroups": [
+                {
+                    "GroupName": "fredrik_SG_euwest1",
+                    "GroupId": "sg-bf4748c4"
+                }
+            ],
+            "ClientToken": "",
+            "SubnetId": "subnet-85b766f3",
+            "InstanceType": "t2.micro",
+            "NetworkInterfaces": [
+                {
+                    "Status": "in-use",
+                    "MacAddress": "06:e8:30:ac:2f:96",
+                    "SourceDestCheck": true,
+                    "VpcId": "vpc-7fb2741b",
+                    "Description": "",
+                    "NetworkInterfaceId": "eni-7c44e84c",
+                    "PrivateIpAddresses": [
+                        {
+                            "PrivateDnsName": "ip-172-31-18-164.eu-west-1.compute.internal",
+                            "Primary": true,
+                            "PrivateIpAddress": "172.31.18.164"
+                        }
+                    ],
+                    "PrivateDnsName": "ip-172-31-18-164.eu-west-1.compute.internal",
+                    "Attachment": {
+                        "Status": "attaching",
+                        "DeviceIndex": 0,
+                        "DeleteOnTermination": true,
+                        "AttachmentId": "eni-attach-32347649",
+                        "AttachTime": "2018-01-10T16:10:58.000Z"
+                    },
+                    "Groups": [
+                        {
+                            "GroupName": "fredrik_SG_euwest1",
+                            "GroupId": "sg-bf4748c4"
+                        }
+                    ],
+                    "Ipv6Addresses": [],
+                    "SubnetId": "subnet-85b766f3",
+                    "OwnerId": "000986988155",
+                    "PrivateIpAddress": "172.31.18.164"
+                }
+            ],
+            "SourceDestCheck": true,
+            "Placement": {
+                "Tenancy": "default",
+                "GroupName": "",
+                "AvailabilityZone": "eu-west-1c"
+            },
+            "Hypervisor": "xen",
+            "BlockDeviceMappings": [],
+            "Architecture": "x86_64",
+            "StateReason": {
+                "Message": "pending",
+                "Code": "pending"
+            },
+            "IamInstanceProfile": {
+                "Id": "AIPAI3ILWQ74LA2BE6J5G",
+                "Arn": "arn:aws:iam::000986988155:instance-profile/ecsInstanceRole"
+            },
+            "RootDeviceName": "/dev/xvda",
+            "VirtualizationType": "hvm",
+            "AmiLaunchIndex": 0
+        }
+    ]
+}
+
+EC2 "InstanceId": "i-0618e7d71f44d6ec7",
+
+
+
+aws --profile op  ec2 describe-instance-status --instance-ids i-07303032b45a7afcb
+{
+    "InstanceStatuses": [
+        {
+            "InstanceId": "i-07303032b45a7afcb",
+            "InstanceState": {
+                "Code": 16,
+                "Name": "running"
+            },
+            "AvailabilityZone": "eu-west-1c",
+            "SystemStatus": {
+                "Status": "ok",
+                "Details": [
+                    {
+                        "Status": "passed",
+                        "Name": "reachability"
+                    }
+                ]
+            },
+            "InstanceStatus": {
+                "Status": "ok",
+                "Details": [
+                    {
+                        "Status": "passed",
+                        "Name": "reachability"
+                    }
+                ]
+            }
+        }
+    ]
+}
+
+aws --profile op  ecs list-container-instances --cluster deepdive
+{
+    "containerInstanceArns": []
+}
+
+
+Ec2 instanse läggs inte till i ecs-clustret
+===========================================
+ssh ec2-user@54.229.247.231 -i ~/.ssh/aws-fredrik-op.pem
+
+Felet var att jag tog fel AMI. Det finns speciella AMI:s för ECS.
+===========================================
+
+$ aws --profile op  ecs list-container-instances --cluster deepdive
+{
+    "containerInstanceArns": [
+        "arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf"
+    ]
+}
+
+aws --profile op  ecs describe-container-instances --cluster deepdive --container-instances arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf
+{
+    "failures": [],
+    "containerInstances": [
+        {
+            "status": "ACTIVE",
+            "registeredResources": [
+                {
+                    "integerValue": 1024,
+                    "longValue": 0,
+                    "type": "INTEGER",
+                    "name": "CPU",
+                    "doubleValue": 0.0
+                },
+                {
+                    "integerValue": 993,
+                    "longValue": 0,
+                    "type": "INTEGER",
+                    "name": "MEMORY",
+                    "doubleValue": 0.0
+                },
+                {
+                    "name": "PORTS",
+                    "longValue": 0,
+                    "doubleValue": 0.0,
+                    "stringSetValue": [
+                        "22",
+                        "2376",
+                        "2375",
+                        "51678",
+                        "51679"
+                    ],
+                    "type": "STRINGSET",
+                    "integerValue": 0
+                },
+                {
+                    "name": "PORTS_UDP",
+                    "longValue": 0,
+                    "doubleValue": 0.0,
+                    "stringSetValue": [],
+                    "type": "STRINGSET",
+                    "integerValue": 0
+                }
+            ],
+            "ec2InstanceId": "i-0618e7d71f44d6ec7",
+            "agentConnected": true,
+            "containerInstanceArn": "arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf",
+            "pendingTasksCount": 0,
+            "remainingResources": [
+                {
+                    "integerValue": 1024,
+                    "longValue": 0,
+                    "type": "INTEGER",
+                    "name": "CPU",
+                    "doubleValue": 0.0
+                },
+                {
+                    "integerValue": 993,
+                    "longValue": 0,
+                    "type": "INTEGER",
+                    "name": "MEMORY",
+                    "doubleValue": 0.0
+                },
+                {
+                    "name": "PORTS",
+                    "longValue": 0,
+                    "doubleValue": 0.0,
+                    "stringSetValue": [
+                        "22",
+                        "2376",
+                        "2375",
+                        "51678",
+                        "51679"
+                    ],
+                    "type": "STRINGSET",
+                    "integerValue": 0
+                },
+                {
+                    "name": "PORTS_UDP",
+                    "longValue": 0,
+                    "doubleValue": 0.0,
+                    "stringSetValue": [],
+                    "type": "STRINGSET",
+                    "integerValue": 0
+                }
+            ],
+            "version": 3,
+            "attributes": [
+                {
+                    "name": "com.amazonaws.ecs.capability.logging-driver.syslog"
+                },
+                {
+                    "name": "ecs.ami-id",
+                    "value": "ami-acb020d5"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.logging-driver.none"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.logging-driver.json-file"
+                },
+                {
+                    "name": "ecs.vpc-id",
+                    "value": "vpc-7fb2741b"
+                },
+                {
+                    "name": "ecs.capability.execution-role-awslogs"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.docker-remote-api.1.17"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+                },
+                {
+                    "name": "ecs.capability.task-cpu-mem-limit"
+                },
+                {
+                    "name": "ecs.capability.task-eni"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.docker-remote-api.1.30"
+                },
+                {
+                    "name": "ecs.capability.execution-role-ecr-pull"
+                },
+                {
+                    "name": "ecs.subnet-id",
+                    "value": "subnet-85b766f3"
+                },
+                {
+                    "name": "ecs.availability-zone",
+                    "value": "eu-west-1c"
+                },
+                {
+                    "name": "ecs.instance-type",
+                    "value": "t2.micro"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.task-iam-role-network-host"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.docker-remote-api.1.24"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.docker-remote-api.1.25"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.privileged-container"
+                },
+                {
+                    "name": "ecs.capability.cni-plugin-version",
+                    "value": "397bc51-2017.10.1"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.ecr-auth"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.docker-remote-api.1.20"
+                },
+                {
+                    "name": "ecs.os-type",
+                    "value": "linux"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.docker-remote-api.1.21"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.docker-remote-api.1.22"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.docker-remote-api.1.23"
+                },
+                {
+                    "name": "com.amazonaws.ecs.capability.task-iam-role"
+                }
+            ],
+            "versionInfo": {
+                "agentVersion": "1.16.1",
+                "agentHash": "ea383f2",
+                "dockerVersion": "DockerVersion: 17.06.2-ce"
+            },
+            "runningTasksCount": 0
+        }
+    ]
+}
+
+
+
+aws --profile op  ecs register-task-definition --cli-input-json file://web-task-definition.json
+{
+    "taskDefinition": {
+        "status": "ACTIVE",
+        "family": "web",
+        "placementConstraints": [],
+        "volumes": [],
+        "taskDefinitionArn": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+        "containerDefinitions": [
+            {
+                "environment": [],
+                "name": "nginx",
+                "mountPoints": [],
+                "image": "nginx",
+                "cpu": 102,
+                "portMappings": [
+                    {
+                        "protocol": "tcp",
+                        "containerPort": 80,
+                        "hostPort": 80
+                    }
+                ],
+                "memory": 50,
+                "essential": true,
+                "volumesFrom": []
+            }
+        ],
+        "revision": 1
+    }
+}
+
+
+ aws --profile op  ecs list-task-definition-families
+{
+    "families": [
+        "FredrikT",
+        "console-sample-app-static",
+        "elias-faxo-task",
+        "opkoko-task-def",
+        "task-webserver-task",
+        "web"
+    ]
+}
+
+
+$ aws --profile op  ecs list-task-definitions
+{
+    "taskDefinitionArns": [
+        "arn:aws:ecs:eu-west-1:000986988155:task-definition/FredrikT:1",
+        "arn:aws:ecs:eu-west-1:000986988155:task-definition/console-sample-app-static:7",
+        "arn:aws:ecs:eu-west-1:000986988155:task-definition/console-sample-app-static:8",
+        "arn:aws:ecs:eu-west-1:000986988155:task-definition/opkoko-task-def:1",
+        "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1"
+    ]
+}
+
+
+$ aws --profile op  ecs describe-task-definition --task-definition web:1
+{
+    "taskDefinition": {
+        "status": "ACTIVE",
+        "family": "web",
+        "placementConstraints": [],
+        "volumes": [],
+        "taskDefinitionArn": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+        "containerDefinitions": [
+            {
+                "environment": [],
+                "name": "nginx",
+                "mountPoints": [],
+                "image": "nginx",
+                "cpu": 102,
+                "portMappings": [
+                    {
+                        "protocol": "tcp",
+                        "containerPort": 80,
+                        "hostPort": 80
+                    }
+                ],
+                "memory": 50,
+                "essential": true,
+                "volumesFrom": []
+            }
+        ],
+        "revision": 1
+    }
+}
+
+$ aws --profile op  ecs deregister-task-definition --task-definition web:2
+{
+    "taskDefinition": {
+        "status": "INACTIVE",
+        "family": "web",
+        "placementConstraints": [],
+        "volumes": [],
+        "taskDefinitionArn": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:2",
+        "containerDefinitions": [
+            {
+                "environment": [],
+                "name": "nginx",
+                "mountPoints": [],
+                "image": "nginx",
+                "cpu": 102,
+                "portMappings": [
+                    {
+                        "protocol": "tcp",
+                        "containerPort": 80,
+                        "hostPort": 80
+                    }
+                ],
+                "memory": 50,
+                "essential": true,
+                "volumesFrom": []
+            }
+        ],
+        "revision": 2
+    }
+}
+
+
+$ aws --profile op  ecs register-task-definition --generate-cli-skeleton
+{
+    "family": "",
+    "taskRoleArn": "",
+    "networkMode": "",
+    "containerDefinitions": [
+        {
+            "name": "",
+            "image": "",
+            "cpu": 0,
+            "memory": 0,
+            "memoryReservation": 0,
+            "links": [
+                ""
+            ],
+            "portMappings": [
+                {
+                    "containerPort": 0,
+                    "hostPort": 0,
+                    "protocol": ""
+                }
+            ],
+            "essential": true,
+            "entryPoint": [
+                ""
+            ],
+            "command": [
+                ""
+            ],
+            "environment": [
+                {
+                    "name": "",
+                    "value": ""
+                }
+            ],
+            "mountPoints": [
+                {
+                    "sourceVolume": "",
+                    "containerPath": "",
+                    "readOnly": true
+                }
+            ],
+            "volumesFrom": [
+                {
+                    "sourceContainer": "",
+                    "readOnly": true
+                }
+            ],
+            "hostname": "",
+            "user": "",
+            "workingDirectory": "",
+            "disableNetworking": true,
+            "privileged": true,
+            "readonlyRootFilesystem": true,
+            "dnsServers": [
+                ""
+            ],
+            "dnsSearchDomains": [
+                ""
+            ],
+            "extraHosts": [
+                {
+                    "hostname": "",
+                    "ipAddress": ""
+                }
+            ],
+            "dockerSecurityOptions": [
+                ""
+            ],
+            "dockerLabels": {
+                "KeyName": ""
+            },
+            "ulimits": [
+                {
+                    "name": "",
+                    "softLimit": 0,
+                    "hardLimit": 0
+                }
+            ],
+            "logConfiguration": {
+                "logDriver": "",
+                "options": {
+                    "KeyName": ""
+                }
+            }
+        }
+    ],
+    "volumes": [
+        {
+            "name": "",
+            "host": {
+                "sourcePath": ""
+            }
+        }
+    ],
+    "placementConstraints": [
+        {
+            "type": "",
+            "expression": ""
+        }
+    ]
+}
+
+$ aws --profile op  ecs create-service --cluster deepdive --service-name web --task-definition web --desired-count 1
+{
+    "service": {
+        "status": "ACTIVE",
+        "taskDefinition": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+        "pendingCount": 0,
+        "loadBalancers": [],
+        "placementConstraints": [],
+        "createdAt": 1515616549.562,
+        "desiredCount": 1,
+        "serviceName": "web",
+        "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+        "serviceArn": "arn:aws:ecs:eu-west-1:000986988155:service/web",
+        "deploymentConfiguration": {
+            "maximumPercent": 200,
+            "minimumHealthyPercent": 100
+        },
+        "deployments": [
+            {
+                "status": "PRIMARY",
+                "pendingCount": 0,
+                "createdAt": 1515616549.562,
+                "desiredCount": 1,
+                "taskDefinition": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+                "updatedAt": 1515616549.562,
+                "id": "ecs-svc/9223370521238226245",
+                "runningCount": 0
+            }
+        ],
+        "events": [],
+        "runningCount": 0,
+        "placementStrategy": []
+    }
+}
+
+
+$ aws --profile op  ecs describe-services --cluster deepdive --services web
+{
+    "services": [
+        {
+            "status": "ACTIVE",
+            "taskDefinition": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+            "pendingCount": 0,
+            "loadBalancers": [],
+            "placementConstraints": [],
+            "createdAt": 1515616549.562,
+            "desiredCount": 1,
+            "serviceName": "web",
+            "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+            "serviceArn": "arn:aws:ecs:eu-west-1:000986988155:service/web",
+            "deploymentConfiguration": {
+                "maximumPercent": 200,
+                "minimumHealthyPercent": 100
+            },
+            "deployments": [
+                {
+                    "status": "PRIMARY",
+                    "pendingCount": 0,
+                    "createdAt": 1515616549.562,
+                    "desiredCount": 1,
+                    "taskDefinition": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+                    "updatedAt": 1515616549.562,
+                    "id": "ecs-svc/9223370521238226245",
+                    "runningCount": 1
+                }
+            ],
+            "events": [
+                {
+                    "message": "(service web) has reached a steady state.",
+                    "id": "0683893b-4ebf-472a-9e02-c3b6ef9afd26",
+                    "createdAt": 1515616559.154
+                },
+                {
+                    "message": "(service web) has started 1 tasks: (task 8dd4fe43-d9e3-4831-8272-901272d778bd).",
+                    "id": "a11af6f1-5ac9-4b1d-b53b-7a87c24b5320",
+                    "createdAt": 1515616549.791
+                }
+            ],
+            "runningCount": 1,
+            "placementStrategy": []
+        }
+    ],
+    "failures": []
+}
+
+public DNS: ec2-34-243-73-136.eu-west-1.compute.amazonaws.com
+
+
+
+Gör en till instans som kör NgineX
+
+$ aws --profile op  ecs update-service --cluster deepdive --service  web --task-definition web --desired-count 2
+{
+    "service": {
+        "status": "ACTIVE",
+        "taskDefinition": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+        "pendingCount": 0,
+        "loadBalancers": [],
+        "placementConstraints": [],
+        "createdAt": 1515616549.562,
+        "desiredCount": 2,
+        "serviceName": "web",
+        "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+        "serviceArn": "arn:aws:ecs:eu-west-1:000986988155:service/web",
+        "deploymentConfiguration": {
+            "maximumPercent": 200,
+            "minimumHealthyPercent": 100
+        },
+        "deployments": [
+            {
+                "status": "PRIMARY",
+                "pendingCount": 0,
+                "createdAt": 1515616549.562,
+                "desiredCount": 2,
+                "taskDefinition": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+                "updatedAt": 1515616549.562,
+                "id": "ecs-svc/9223370521238226245",
+                "runningCount": 1
+            }
+        ],
+        "events": [
+            {
+                "message": "(service web) has reached a steady state.",
+                "id": "0683893b-4ebf-472a-9e02-c3b6ef9afd26",
+                "createdAt": 1515616559.154
+            },
+            {
+                "message": "(service web) has started 1 tasks: (task 8dd4fe43-d9e3-4831-8272-901272d778bd).",
+                "id": "a11af6f1-5ac9-4b1d-b53b-7a87c24b5320",
+                "createdAt": 1515616549.791
+            }
+        ],
+        "runningCount": 1,
+        "placementStrategy": []
+    }
+}
+
+
+Det gick fel eftersom porten redan används.
+
+$ aws --profile op  ecs describe-services --cluster deepdive --services web
+{
+    "services": [
+        {
+            "status": "ACTIVE",
+            "taskDefinition": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+            "pendingCount": 0,
+            "loadBalancers": [],
+            "placementConstraints": [],
+            "createdAt": 1515616549.562,
+            "desiredCount": 2,
+            "serviceName": "web",
+            "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+            "serviceArn": "arn:aws:ecs:eu-west-1:000986988155:service/web",
+            "deploymentConfiguration": {
+                "maximumPercent": 200,
+                "minimumHealthyPercent": 100
+            },
+            "deployments": [
+                {
+                    "status": "PRIMARY",
+                    "pendingCount": 0,
+                    "createdAt": 1515616549.562,
+                    "desiredCount": 2,
+                    "taskDefinition": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+                    "updatedAt": 1515616990.308,
+                    "id": "ecs-svc/9223370521238226245",
+                    "runningCount": 1
+                }
+            ],
+            "events": [
+                {
+                    "message": "(service web) was unable to place a task because no container instance met all of its requirements. The closest matching (container-instance da31a2d6-36e0-4377-af6f-4d3fd369a3bf) is already using a port required by your task. For more information, see the Troubleshooting section of the Amazon ECS Developer Guide.",
+                    "id": "2e5398cd-7165-4847-866b-ab437504c24d",
+                    "createdAt": 1515617007.931
+                },
+                {
+                    "message": "(service web) has reached a steady state.",
+                    "id": "0683893b-4ebf-472a-9e02-c3b6ef9afd26",
+                    "createdAt": 1515616559.154
+                },
+                {
+                    "message": "(service web) has started 1 tasks: (task 8dd4fe43-d9e3-4831-8272-901272d778bd).",
+                    "id": "a11af6f1-5ac9-4b1d-b53b-7a87c24b5320",
+                    "createdAt": 1515616549.791
+                }
+            ],
+            "runningCount": 1,
+            "placementStrategy": []
+        }
+    ],
+    "failures": []
+}
+
+!!!Måste ta bort tasks innan services kan deletas
+
+
+ aws --profile op  ecs update-service --cluster deepdive --service  web --task-definition web --desired-count 0
+
+
+Ta bort servicen
+$ aws --profile op  ecs delete-service --cluster deepdive --service  web
+{
+    "service": {
+        "status": "DRAINING",
+        "taskDefinition": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+        "pendingCount": 0,
+        "loadBalancers": [],
+        "placementConstraints": [],
+        "createdAt": 1515616549.562,
+        "desiredCount": 0,
+        "serviceName": "web",
+        "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+        "serviceArn": "arn:aws:ecs:eu-west-1:000986988155:service/web",
+        "deploymentConfiguration": {
+            "maximumPercent": 200,
+            "minimumHealthyPercent": 100
+        },
+        "deployments": [
+            {
+                "status": "PRIMARY",
+                "pendingCount": 0,
+                "createdAt": 1515616549.562,
+                "desiredCount": 0,
+                "taskDefinition": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+                "updatedAt": 1515617363.736,
+                "id": "ecs-svc/9223370521238226245",
+                "runningCount": 0
+            }
+        ],
+        "events": [
+            {
+                "message": "(service web) has reached a steady state.",
+                "id": "f7d19cbe-c6cf-48e4-ac6f-c7986cfc5292",
+                "createdAt": 1515617408.904
+            },
+            {
+                "message": "(service web) has stopped 1 running tasks: (task 8dd4fe43-d9e3-4831-8272-901272d778bd).",
+                "id": "7ecf89a3-207f-453b-8de1-b987903ec091",
+                "createdAt": 1515617398.466
+            },
+            {
+                "message": "(service web) was unable to place a task because no container instance met all of its requirements. The closest matching (container-instance da31a2d6-36e0-4377-af6f-4d3fd369a3bf) is already using a port required by your task. For more information, see the Troubleshooting section of the Amazon ECS Developer Guide.",
+                "id": "2e5398cd-7165-4847-866b-ab437504c24d",
+                "createdAt": 1515617007.931
+            },
+            {
+                "message": "(service web) has reached a steady state.",
+                "id": "0683893b-4ebf-472a-9e02-c3b6ef9afd26",
+                "createdAt": 1515616559.154
+            },
+            {
+                "message": "(service web) has started 1 tasks: (task 8dd4fe43-d9e3-4831-8272-901272d778bd).",
+                "id": "a11af6f1-5ac9-4b1d-b53b-7a87c24b5320",
+                "createdAt": 1515616549.791
+            }
+        ],
+        "runningCount": 0,
+        "placementStrategy": []
+    }
+}
+
+
+$ aws --profile op  ecs list-services --cluster deepdive
+{
+    "serviceArns": []
+}
+
+
+$ aws --profile op  ecs create-service --generate-cli-skeleton
+{
+    "cluster": "",
+    "serviceName": "",
+    "taskDefinition": "",
+    "loadBalancers": [
+        {
+            "targetGroupArn": "",
+            "loadBalancerName": "",
+            "containerName": "",
+            "containerPort": 0
+        }
+    ],
+    "desiredCount": 0,
+    "clientToken": "",
+    "role": "",
+    "deploymentConfiguration": {
+        "maximumPercent": 0,
+        "minimumHealthyPercent": 0
+    },
+    "placementConstraints": [
+        {
+            "type": "",
+            "expression": ""
+        }
+    ],
+    "placementStrategy": [
+        {
+            "type": "",
+            "field": ""
+        }
+    ]
+}
+
+$ aws --profile op  ecs run-task --cluster deepdive --task-definition web --count 1
+{
+    "failures": [],
+    "tasks": [
+        {
+            "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/ebdf05d0-0db5-4c87-8a80-43911c8b1297",
+            "group": "family:web",
+            "overrides": {
+                "containerOverrides": [
+                    {
+                        "name": "nginx"
+                    }
+                ]
+            },
+            "lastStatus": "PENDING",
+            "containerInstanceArn": "arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf",
+            "createdAt": 1515617763.647,
+            "version": 1,
+            "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+            "desiredStatus": "RUNNING",
+            "taskDefinitionArn": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+            "containers": [
+                {
+                    "containerArn": "arn:aws:ecs:eu-west-1:000986988155:container/eca992eb-02fe-405b-b6e1-6f1e0e12180c",
+                    "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/ebdf05d0-0db5-4c87-8a80-43911c8b1297",
+                    "lastStatus": "PENDING",
+                    "name": "nginx"
+                }
+            ]
+        }
+    ]
+}
+
+$ aws --profile op  ecs run-task --cluster deepdive --task-definition web --count 1
+{
+    "failures": [],
+    "tasks": [
+        {
+            "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/ebdf05d0-0db5-4c87-8a80-43911c8b1297",
+            "group": "family:web",
+            "overrides": {
+                "containerOverrides": [
+                    {
+                        "name": "nginx"
+                    }
+                ]
+            },
+            "lastStatus": "PENDING",
+            "containerInstanceArn": "arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf",
+            "createdAt": 1515617763.647,
+            "version": 1,
+            "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+            "desiredStatus": "RUNNING",
+            "taskDefinitionArn": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+            "containers": [
+                {
+                    "containerArn": "arn:aws:ecs:eu-west-1:000986988155:container/eca992eb-02fe-405b-b6e1-6f1e0e12180c",
+                    "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/ebdf05d0-0db5-4c87-8a80-43911c8b1297",
+                    "lastStatus": "PENDING",
+                    "name": "nginx"
+                }
+            ]
+        }
+    ]
+}
+fredrik@Fredriks-MBP-2 ~/Documents/docker_on_aws_udemy/deepdive
+$ aws --profile op  ecs list-tasks --cluster deepdive
+{
+    "taskArns": [
+        "arn:aws:ecs:eu-west-1:000986988155:task/ebdf05d0-0db5-4c87-8a80-43911c8b1297"
+    ]
+}
+fredrik@Fredriks-MBP-2 ~/Documents/docker_on_aws_udemy/deepdive
+$ aws --profile op  ecs stop-task --cluster deepdive --task arn:aws:ecs:eu-west-1:000986988155:task/ebdf05d0-0db5-4c87-8a80-43911c8b1297
+{
+    "task": {
+        "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/ebdf05d0-0db5-4c87-8a80-43911c8b1297",
+        "group": "family:web",
+        "overrides": {
+            "containerOverrides": [
+                {
+                    "name": "nginx"
+                }
+            ]
+        },
+        "lastStatus": "RUNNING",
+        "containerInstanceArn": "arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf",
+        "createdAt": 1515617763.647,
+        "version": 3,
+        "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+        "startedAt": 1515617768.857,
+        "desiredStatus": "STOPPED",
+        "stoppedReason": "Task stopped by user",
+        "taskDefinitionArn": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+        "containers": [
+            {
+                "containerArn": "arn:aws:ecs:eu-west-1:000986988155:container/eca992eb-02fe-405b-b6e1-6f1e0e12180c",
+                "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/ebdf05d0-0db5-4c87-8a80-43911c8b1297",
+                "lastStatus": "RUNNING",
+                "name": "nginx",
+                "networkBindings": [
+                    {
+                        "protocol": "tcp",
+                        "bindIP": "0.0.0.0",
+                        "containerPort": 80,
+                        "hostPort": 80
+                    }
+                ]
+            }
+        ]
+    }
+}
+
+
+!!!!!!!Start the task on a specified container instance
+
+
+$ aws --profile op  ecs list-container-instances --cluster deepdive
+{
+    "containerInstanceArns": [
+        "arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf"
+    ]
+}
+
+
+$ aws --profile op  ecs start-task --cluster deepdive --task-definition web --container-instances arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf
+{
+    "failures": [],
+    "tasks": [
+        {
+            "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/8d205045-901f-4600-91c9-a315ad974977",
+            "group": "family:web",
+            "overrides": {
+                "containerOverrides": [
+                    {
+                        "name": "nginx"
+                    }
+                ]
+            },
+            "lastStatus": "PENDING",
+            "containerInstanceArn": "arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf",
+            "createdAt": 1515618033.776,
+            "version": 1,
+            "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+            "desiredStatus": "RUNNING",
+            "taskDefinitionArn": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+            "containers": [
+                {
+                    "containerArn": "arn:aws:ecs:eu-west-1:000986988155:container/1785a9e0-6a8c-4bee-8935-8ab29928f19c",
+                    "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/8d205045-901f-4600-91c9-a315ad974977",
+                    "lastStatus": "PENDING",
+                    "name": "nginx"
+                }
+            ]
+        }
+    ]
+}
+
+$ aws --profile op  ecs stop-task --cluster deepdive --task arn:aws:ecs:eu-west-1:000986988155:task/8d205045-901f-4600-91c9-a315ad974977
+{
+    "task": {
+        "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/8d205045-901f-4600-91c9-a315ad974977",
+        "group": "family:web",
+        "overrides": {
+            "containerOverrides": [
+                {
+                    "name": "nginx"
+                }
+            ]
+        },
+        "lastStatus": "RUNNING",
+        "containerInstanceArn": "arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf",
+        "createdAt": 1515618033.776,
+        "version": 4,
+        "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+        "startedAt": 1515618036.145,
+        "desiredStatus": "STOPPED",
+        "stoppedReason": "Task stopped by user",
+        "taskDefinitionArn": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:1",
+        "containers": [
+            {
+                "containerArn": "arn:aws:ecs:eu-west-1:000986988155:container/1785a9e0-6a8c-4bee-8935-8ab29928f19c",
+                "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/8d205045-901f-4600-91c9-a315ad974977",
+                "lastStatus": "RUNNING",
+                "name": "nginx",
+                "networkBindings": [
+                    {
+                        "protocol": "tcp",
+                        "bindIP": "0.0.0.0",
+                        "containerPort": 80,
+                        "hostPort": 80
+                    }
+                ]
+            }
+        ]
+    }
+}
+
+OBS! This command is newer than that in the course !!!!!!
+
+<----  aws --profile op ecr get-login  --no-include-email --->
+
+
+docker login -u AWS -p eyJwYXlsb2FkIjoiZnh3cWUxQkFQUXFTeFlmQUlBdXQvc1lnc0RscjlLQ05tdE1YTW9wZkVQWHRzNTBwSDZVOERaSjlhU1VhM0JMTjJjVzBKMi9vNWR5MTQySjFYK1Z1YlNYaEZYc2poa0RGYmNXUC8xckZoN09sNVEra21DMlFOY3Q5dDJ1bFFsOHRGUDRFRWdKWVlNUGY3UFZ3dmEwazVyUzZwN2c4OTZVRmJkeU9wYlZOaGlqbWozNmUvaDByOHNaR3FkMlNlUWpETnhkb0NteWVqUzVsdFhZMlF6am9iK3p3VHJITmZyY3VXUGpaZVU0WXJsZnVpaDhxazlndDM3c0grR01QcXNsU2QvOEVnUzZMZEJZR29kZXVEdkZNVzZINVlXeVlpZmxnSm1ManBBc09mSlBESFVLbmRvWlBDaFFYbkxzRGh5RHAwbWNXdE1LZnZBRmRmQkpmYVh3aWZWb1RTZGVBWit1Zlhaa0UzVC9pbWgrM1dJU0I5U0JXWG9xRDh0amlKRkkvTXd2d051UEJmcWhXVmZ6bHdnaU5BOFEvc0R4Z1IwQmtFd2FWQUdzS0VGVHB3d3VnTE9uNlgrbVp2dGpoM2Y1WldiZ3dvRHdkakZVYUNmRlQ1K1VmdklTaEhhN2dvQ1pDUzJiYytMcTJNWk1vRUdwOGx2K2xueGN0VUQ3RSs3RVRiVEFnZDlWOUt0dktZK2hGaWpsb0JPNjNwRHVqci9jY1g1ejdjcmdhOWFzNm9zamhod0NINFVxOTJoWG01MGVTcldHK1hlc2xsdXJZNXVCOTFRTHFuL2dEaER2cUVRU3cwbVJiYlBRbTZlU1hteUwvSUQwQTlPNkwxYmIyK3NBVHRockp4T3VvcXVuTHZuTmhoNDVNbG1oZVpSZ00rejFzbFdPY2VzSUVhZjlzbkt3aWR1VjcyWlRTbHUvQXY2Mi9NeU1la21FWnlVTGNaQjUwaVpibHFmeUcrVDBObndwR3haMTloK205NjRzT0Q2YW1HNmxmU0ZrS3BaT3NnaWVGS2dwRkQ3ZzJ2NmlETWV3c2tEeHpEODJNK0JJT0x1cDZmU0hLeHdSKzlLL1pnN0MvNWh5Yk1ZcDJlWmhaenVIVkNXSkdaSThYa1BvdGNyQjMra0FqcEs1Wi95UmNnWlVmU3hxM0FjYW5aZm80QVVRWVlicUJBRlczNGs1bit2Q01vMHVuT3RTYWNwTWJOVDdSZWdMK3RDMWV4N09YckhPQjJTQkhESmM1Z1lUenhKSGRPT0Q3bDZTOEpSYW14WlpiWkt0YzFtQVBqR1ZNR0xIallkT1plU0tDODNZUzliWktZWm1hQXVxeTRSckJrTUs5TG1FM25WdDZacldMSjA0SXgrWHl4RzFjbkwyZXFVWjRvbCsvL3RvYVNjZnlQNVovNDdRdUFTWHFBeHRTZG9VYkJKVG9XZnJjK2ZpTXUycWtJL1Z2ZExNREpvbjg4L2JOWW9FdzdUNjMiLCJkYXRha2V5IjoiQVFFQkFIaCtkUytCbE51ME54blh3b3diSUxzMTE1eWpkK0xOQVpoQkxac3VuT3hrM0FBQUFINHdmQVlKS29aSWh2Y05BUWNHb0c4d2JRSUJBREJvQmdrcWhraUc5dzBCQndFd0hnWUpZSVpJQVdVREJBRXVNQkVFRE4wMU9NNWg3UkM2bUxZNThnSUJFSUE3YmlkckpyOVgyVmQ5d25nekdFUTB1WXdYN2pPaFZOREJadGJ6Q0lMZWRETXlaNklETmlqNkV3L1RrOEx5V2lPamdYUm5STjRwdms5UVNRdz0iLCJ2ZXJzaW9uIjoiMiIsInR5cGUiOiJEQVRBX0tFWSIsImV4cGlyYXRpb24iOjE1MTU3ODk2OTl9 https://000986988155.dkr.ecr.eu-west-1.amazonaws.com
+
+
+REGISTRY: https://000986988155.dkr.ecr.eu-west-1.amazonaws.com
+
+
+
+$ aws --profile op ecr create-repository --repository-name deepdive/nginx
+{
+    "repository": {
+        "registryId": "000986988155",
+        "repositoryName": "deepdive/nginx",
+        "repositoryArn": "arn:aws:ecr:eu-west-1:000986988155:repository/deepdive/nginx",
+        "createdAt": 1515746707.0,
+        "repositoryUri": "000986988155.dkr.ecr.eu-west-1.amazonaws.com/deepdive/nginx"
+    }
+}
+
+$ aws --profile op ecr describe-repositories
+{
+    "repositories": [
+        {
+            "registryId": "000986988155",
+            "repositoryName": "deepdive/nginx",
+            "repositoryArn": "arn:aws:ecr:eu-west-1:000986988155:repository/deepdive/nginx",
+            "createdAt": 1515746707.0,
+            "repositoryUri": "000986988155.dkr.ecr.eu-west-1.amazonaws.com/deepdive/nginx"
+        }
+    ]
+}
+
+
+$ aws --profile op ecr list-images --repository-name deepdive/nginex
+
+An error occurred (RepositoryNotFoundException) when calling the ListImages operation: The repository with name 'deepdive/nginex' does not exist in the registry with id '000986988155'
+fredrik@Fredriks-MBP-2 ~/Documents/docker_on_aws_udemy/deepdive
+$ aws --profile op ecr list-images --repository-name deepdive/nginx
+{
+    "imageIds": []
+}
+
+$ docker pull nginx:1.9
+1.9: Pulling from library/nginx
+51f5c6a04d83: Pull complete
+a3ed95caeb02: Pull complete
+640c8f3d0eb2: Pull complete
+a4335300aa89: Pull complete
+Digest: sha256:54313b5c376892d55205f13d620bc3dcccc8e70e596d083953f95e94f071f6db
+Status: Downloaded newer image for nginx:1.9
+
+Need to tag the image
+$ docker tag nginx:1.9 000986988155.dkr.ecr.eu-west-1.amazonaws.com/deepdive/nginx:1.9
+
+Push the image to ECR
+$ docker push 000986988155.dkr.ecr.eu-west-1.amazonaws.com/deepdive/nginx
+The push refers to a repository [000986988155.dkr.ecr.eu-west-1.amazonaws.com/deepdive/nginx]
+5f70bf18a086: Pushed
+49027b789c92: Pushed
+20f8e7504ae5: Pushed
+4dcab49015d4: Pushed
+1.9: digest: sha256:47baebffb23533d43d204167162dc6a8f0a3a59eea68942d81915e09bc49c4d9 size: 1978
+
+List Images
+$ aws --profile op ecr list-images --repository-name deepdive/nginx
+{
+    "imageIds": [
+        {
+            "imageTag": "1.9",
+            "imageDigest": "sha256:47baebffb23533d43d204167162dc6a8f0a3a59eea68942d81915e09bc49c4d9"
+        }
+    ]
+}
+
+
+
+Edit the web task definition file to point to the ecr registry. Otherwise the image would be pulled from dockerhub.
+Then run:
+
+$ aws --profile op  ecs register-task-definition --cli-input-json file://web-task-definition.json
+{
+    "taskDefinition": {
+        "status": "ACTIVE",
+        "family": "web",
+        "placementConstraints": [],
+        "requiresAttributes": [
+            {
+                "name": "com.amazonaws.ecs.capability.ecr-auth"
+            }
+        ],
+        "compatibilities": [
+            "EC2"
+        ],
+        "volumes": [],
+        "taskDefinitionArn": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:3",
+        "containerDefinitions": [
+            {
+                "environment": [],
+                "name": "nginx",
+                "mountPoints": [],
+                "image": "000986988155.dkr.ecr.eu-west-1.amazonaws.com/deepdive/nginx:1.9",
+                "cpu": 102,
+                "portMappings": [
+                    {
+                        "protocol": "tcp",
+                        "containerPort": 80,
+                        "hostPort": 80
+                    }
+                ],
+                "memory": 50,
+                "essential": true,
+                "volumesFrom": []
+            }
+        ],
+        "revision": 3
+    }
+}
+
+
+$ aws --profile op  ecs run-task --cluster deepdive --task-definition web --count 1
+{
+    "failures": [],
+    "tasks": [
+        {
+            "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/c26ca5a7-3a07-4e67-942e-f4df0059f045",
+            "group": "family:web",
+            "attachments": [],
+            "overrides": {
+                "containerOverrides": [
+                    {
+                        "name": "nginx"
+                    }
+                ]
+            },
+            "launchType": "EC2",
+            "lastStatus": "PENDING",
+            "containerInstanceArn": "arn:aws:ecs:eu-west-1:000986988155:container-instance/da31a2d6-36e0-4377-af6f-4d3fd369a3bf",
+            "createdAt": 1515747422.105,
+            "version": 1,
+            "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/deepdive",
+            "memory": "50",
+            "desiredStatus": "RUNNING",
+            "taskDefinitionArn": "arn:aws:ecs:eu-west-1:000986988155:task-definition/web:3",
+            "cpu": "102",
+            "containers": [
+                {
+                    "containerArn": "arn:aws:ecs:eu-west-1:000986988155:container/ed368508-1428-492f-ba28-7a6e48913975",
+                    "taskArn": "arn:aws:ecs:eu-west-1:000986988155:task/c26ca5a7-3a07-4e67-942e-f4df0059f045",
+                    "lastStatus": "PENDING",
+                    "name": "nginx",
+                    "networkInterfaces": []
+                }
+            ]
+        }
+    ]
+}
+
+
+Tear down
+---------
+
+1. EC2 "InstanceId": "i-0618e7d71f44d6ec7",
+2. ECR
+3. ECS cluster
+
+
+Developing the Ruby on Rails Application
+========================================
+
+docker run --rm  \
+-v "$PWD":/usr/src/app -w /usr/src/app rails:4 \
+rails new --skip-qbundle dockerzon
+
+
+
+
+Skapa Databas
+=============
+$ aws --profile op rds create-db-instance --engine postgres \
+> --no-multi-az --no-publicly-accessible \
+> --vpc-security-group-ids sg-bf4748c4 \
+> --db-instance-class db.t2.micro --allocated-storage 20 \
+> --db-instance-identifier dockerzon-production \
+> --db-name dockerzon_production --master-username dockerzon \
+> --master-user-password intergalacticzebramoldfactory
+{
+    "DBInstance": {
+        "PubliclyAccessible": false,
+        "MasterUsername": "dockerzon",
+        "MonitoringInterval": 0,
+        "LicenseModel": "postgresql-license",
+        "VpcSecurityGroups": [
+            {
+                "Status": "active",
+                "VpcSecurityGroupId": "sg-bf4748c4"
+            }
+        ],
+        "CopyTagsToSnapshot": false,
+        "OptionGroupMemberships": [
+            {
+                "Status": "in-sync",
+                "OptionGroupName": "default:postgres-9-6"
+            }
+        ],
+        "PendingModifiedValues": {
+            "MasterUserPassword": "****"
+        },
+        "Engine": "postgres",
+        "MultiAZ": false,
+        "DBSecurityGroups": [],
+        "DBParameterGroups": [
+            {
+                "DBParameterGroupName": "default.postgres9.6",
+                "ParameterApplyStatus": "in-sync"
+            }
+        ],
+        "PerformanceInsightsEnabled": false,
+        "AutoMinorVersionUpgrade": true,
+        "PreferredBackupWindow": "02:23-02:53",
+        "DBSubnetGroup": {
+            "Subnets": [
+                {
+                    "SubnetStatus": "Active",
+                    "SubnetIdentifier": "subnet-6957fb0d",
+                    "SubnetAvailabilityZone": {
+                        "Name": "eu-west-1b"
+                    }
+                },
+                {
+                    "SubnetStatus": "Active",
+                    "SubnetIdentifier": "subnet-af7895f7",
+                    "SubnetAvailabilityZone": {
+                        "Name": "eu-west-1a"
+                    }
+                },
+                {
+                    "SubnetStatus": "Active",
+                    "SubnetIdentifier": "subnet-85b766f3",
+                    "SubnetAvailabilityZone": {
+                        "Name": "eu-west-1c"
+                    }
+                }
+            ],
+            "DBSubnetGroupName": "default",
+            "VpcId": "vpc-7fb2741b",
+            "DBSubnetGroupDescription": "default",
+            "SubnetGroupStatus": "Complete"
+        },
+        "ReadReplicaDBInstanceIdentifiers": [],
+        "AllocatedStorage": 20,
+        "DBInstanceArn": "arn:aws:rds:eu-west-1:000986988155:db:dockerzon-production",
+        "BackupRetentionPeriod": 1,
+        "DBName": "dockerzon_production",
+        "PreferredMaintenanceWindow": "tue:00:22-tue:00:52",
+        "DBInstanceStatus": "creating",
+        "IAMDatabaseAuthenticationEnabled": false,
+        "EngineVersion": "9.6.5",
+        "DomainMemberships": [],
+        "StorageType": "standard",
+        "DbiResourceId": "db-E5GNJ2HKI6YIDHKUYDAP2J7TYI",
+        "CACertificateIdentifier": "rds-ca-2015",
+        "StorageEncrypted": false,
+        "DBInstanceClass": "db.t2.micro",
+        "DbInstancePort": 0,
+        "DBInstanceIdentifier": "dockerzon-production"
+    }
+}
+
+
+
+REDIS
+=====
+$ aws --profile op elasticache create-cache-cluster --engine redis \
+> --security-group-ids sg-bf4748c4 --cache-node-type cache.t2.micro \
+> --num-cache-nodes 1 --cache-cluster-id dockerzon-production
+{
+    "CacheCluster": {
+        "Engine": "redis",
+        "CacheParameterGroup": {
+            "CacheNodeIdsToReboot": [],
+            "CacheParameterGroupName": "default.redis3.2",
+            "ParameterApplyStatus": "in-sync"
+        },
+        "CacheClusterId": "dockerzon-production",
+        "CacheSecurityGroups": [],
+        "NumCacheNodes": 1,
+        "AtRestEncryptionEnabled": false,
+        "AutoMinorVersionUpgrade": true,
+        "CacheClusterStatus": "creating",
+        "ClientDownloadLandingPage": "https://console.aws.amazon.com/elasticache/home#client-download:",
+        "SecurityGroups": [
+            {
+                "Status": "active",
+                "SecurityGroupId": "sg-bf4748c4"
+            }
+        ],
+        "TransitEncryptionEnabled": false,
+        "CacheSubnetGroupName": "default",
+        "EngineVersion": "3.2.10",
+        "PendingModifiedValues": {},
+        "PreferredMaintenanceWindow": "mon:23:00-tue:00:00",
+        "CacheNodeType": "cache.t2.micro"
+    }
+}
+fredrik@Fredriks-MBP-2 ~/Documents/docker_on_aws_udemy/dockerzon
+$ aws --profile op elasticache describe-cache-clusters
+{
+    "CacheClusters": [
+        {
+            "Engine": "redis",
+            "AuthTokenEnabled": false,
+            "CacheParameterGroup": {
+                "CacheNodeIdsToReboot": [],
+                "CacheParameterGroupName": "default.redis3.2",
+                "ParameterApplyStatus": "in-sync"
+            },
+            "CacheClusterId": "dockerzon-production",
+            "CacheSecurityGroups": [],
+            "NumCacheNodes": 1,
+            "AtRestEncryptionEnabled": false,
+            "AutoMinorVersionUpgrade": true,
+            "CacheClusterStatus": "creating",
+            "ClientDownloadLandingPage": "https://console.aws.amazon.com/elasticache/home#client-download:",
+            "SecurityGroups": [
+                {
+                    "Status": "active",
+                    "SecurityGroupId": "sg-bf4748c4"
+                }
+            ],
+            "TransitEncryptionEnabled": false,
+            "CacheSubnetGroupName": "default",
+            "EngineVersion": "3.2.10",
+            "PendingModifiedValues": {},
+            "PreferredMaintenanceWindow": "mon:23:00-tue:00:00",
+            "CacheNodeType": "cache.t2.micro"
+        }
+    ]
+}
+
+
+
+Hitta subnets i default VPC i eu-west-1:
+$ aws --profile op ec2 describe-subnets
+{
+    "Subnets": [
+        {
+            "AvailabilityZone": "eu-west-1c",
+            "Tags": [
+                {
+                    "Value": "368321020290",
+                    "Key": "AWSServiceAccount"
+                }
+            ],
+            "AvailableIpAddressCount": 251,
+            "DefaultForAz": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "VpcId": "vpc-5d153839",
+            "State": "available",
+            "MapPublicIpOnLaunch": false,
+            "SubnetId": "subnet-90eadbe6",
+            "CidrBlock": "172.16.1.0/24",
+            "AssignIpv6AddressOnCreation": false
+        },
+        {
+            "AvailabilityZone": "eu-west-1c",
+            "AvailableIpAddressCount": 4087,
+            "DefaultForAz": true,
+            "Ipv6CidrBlockAssociationSet": [],
+            "VpcId": "vpc-7fb2741b",
+            "State": "available",
+            "MapPublicIpOnLaunch": true,
+            "SubnetId": "subnet-85b766f3",
+            "CidrBlock": "172.31.16.0/20",
+            "AssignIpv6AddressOnCreation": false
+        },
+        {
+            "AvailabilityZone": "eu-west-1a",
+            "Tags": [
+                {
+                    "Value": "apimicrogatewa-1",
+                    "Key": "Name"
+                }
+            ],
+            "AvailableIpAddressCount": 10,
+            "DefaultForAz": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "VpcId": "vpc-60535704",
+            "State": "available",
+            "MapPublicIpOnLaunch": false,
+            "SubnetId": "subnet-37baf06f",
+            "CidrBlock": "192.168.1.0/28",
+            "AssignIpv6AddressOnCreation": false
+        },
+        {
+            "AvailabilityZone": "eu-west-1a",
+            "Tags": [
+                {
+                    "Value": "10.0.1.0-eu-west-1a",
+                    "Key": "Name"
+                }
+            ],
+            "AvailableIpAddressCount": 251,
+            "DefaultForAz": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "VpcId": "vpc-a9cb5ecd",
+            "State": "available",
+            "MapPublicIpOnLaunch": false,
+            "SubnetId": "subnet-a6fe49fe",
+            "CidrBlock": "10.0.1.0/24",
+            "AssignIpv6AddressOnCreation": false
+        },
+        {
+            "AvailabilityZone": "eu-west-1b",
+            "AvailableIpAddressCount": 4089,
+            "DefaultForAz": true,
+            "Ipv6CidrBlockAssociationSet": [],
+            "VpcId": "vpc-7fb2741b",
+            "State": "available",
+            "MapPublicIpOnLaunch": true,
+            "SubnetId": "subnet-6957fb0d",
+            "CidrBlock": "172.31.0.0/20",
+            "AssignIpv6AddressOnCreation": false
+        },
+        {
+            "AvailabilityZone": "eu-west-1b",
+            "Tags": [
+                {
+                    "Value": "368321020290",
+                    "Key": "AWSServiceAccount"
+                }
+            ],
+            "AvailableIpAddressCount": 251,
+            "DefaultForAz": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "VpcId": "vpc-5d153839",
+            "State": "available",
+            "MapPublicIpOnLaunch": false,
+            "SubnetId": "subnet-1f320f7b",
+            "CidrBlock": "172.16.0.0/24",
+            "AssignIpv6AddressOnCreation": false
+        },
+        {
+            "AvailabilityZone": "eu-west-1a",
+            "Tags": [
+                {
+                    "Value": "apimicrogateway-2",
+                    "Key": "Name"
+                }
+            ],
+            "AvailableIpAddressCount": 10,
+            "DefaultForAz": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "VpcId": "vpc-60535704",
+            "State": "available",
+            "MapPublicIpOnLaunch": false,
+            "SubnetId": "subnet-1760e64c",
+            "CidrBlock": "192.168.1.128/28",
+            "AssignIpv6AddressOnCreation": false
+        },
+        {
+            "AvailabilityZone": "eu-west-1a",
+            "AvailableIpAddressCount": 4088,
+            "DefaultForAz": true,
+            "Ipv6CidrBlockAssociationSet": [],
+            "VpcId": "vpc-7fb2741b",
+            "State": "available",
+            "MapPublicIpOnLaunch": true,
+            "SubnetId": "subnet-af7895f7",
+            "CidrBlock": "172.31.32.0/20",
+            "AssignIpv6AddressOnCreation": false
+        }
+    ]
+}
+
+
+Hitta rätt subnet genom att hitta vilka som har :  "DefaultForAz": true, satt
+1a:             "SubnetId": "subnet-af7895f7",
+1b:             "SubnetId": "subnet-6957fb0d",
+1c:             "SubnetId": "subnet-85b766f3",
+
+
+
+aws  --profile op elb create-load-balancer --load-balancer-name dockerzon-web \
+--listeners "Protocol=HTTP,LoadBalancerPort=80,InstanceProtocol=HTTP,InstancePort=80" \
+--subnets subnet-af7895f7 subnet-6957fb0d subnet-85b766f3  \
+--security-groups sg-bf4748c4
+
+{
+    "DNSName": "dockerzon-web-803630894.eu-west-1.elb.amazonaws.com"
+}
+
+
+aws --profile op elb describe-load-balancers
+
+aws --profile op elb modify-load-balancer-attributes --load-balancer-name dockerzon-web --load-balancer-attributes \
+"{\"ConnectionSettings\":{\"IdleTimeout\":5}}"
+
+
+    "LoadBalancerAttributes": {
+        "ConnectionSettings": {
+            "IdleTimeout": 5
+        }
+    },
+    "LoadBalancerName": "dockerzon-web"
+}
+
+
+
+$ aws --profile op elb configure-health-check --load-balancer-name dockerzon-web --health-check "Target=HTTP:80/health_check,Timeout=5,Interval=30,UnhealthyThreshold=2,HealthyThreshold=10"
+{
+    "HealthCheck": {
+        "HealthyThreshold": 10,
+        "Interval": 30,
+        "Target": "HTTP:80/health_check",
+        "Timeout": 5,
+        "UnhealthyThreshold": 2
+    }
+}
+
+
+
+L48. Create Cluster
+===================
+aws  --profile op  ecs create-cluster --cluster-name production
+
+{
+    "cluster": {
+        "status": "ACTIVE",
+        "clusterName": "production",
+        "registeredContainerInstancesCount": 0,
+        "pendingTasksCount": 0,
+        "runningTasksCount": 0,
+        "activeServicesCount": 0,
+        "clusterArn": "arn:aws:ecs:eu-west-1:000986988155:cluster/production"
+    }
+}
+
+Copy the ECS config file you downloaded to the S3 bucket
+aws  --profile op  s3 cp ecs.config s3://fredrik-dockerzon/ecs.config
+
+Verify the ECS config is in the S3 bucket
+aws  --profile op  s3 ls s3://fredrik-dockerzon
+
+Edit the copyecsconfigtos3
+
+
+Creating the Private Registry Repositories
+==============================================
+Authenticate your docker client to Amazon ECR
+aws ecr get-login
+● Copy/paste the output into a terminal to authenticate yourself for 12 hours
+● Make a note of your registry URL for later
+
+Create a dockerzon repository to house the Rails application
+aws ecr create-repository --repository-name dockerzon/dockerzon
+
+Create an nginx repository to house the custom version of nginx
+aws ecr create-repository --repository-name dockerzon/nginx
+
+Describe all repositories
+aws ecr describe-repositories
+
+Tag the Dockerzon image
+docker tag dockerzon_dockerzon:latest \
+xxx.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/dockerzon:latest
+● Replace my AccountId (xxx) with yours
+
+Push the Dockerzon image to your repository
+docker push xxx.dkr.ecr.us-east-1.amazonaws.com/dockerzon/dockerzon
+● Replace my AccountId (xxx) with yours
+
+Tag the nginx image
+docker tag dockerzon_nginx:latest \
+xxx.dkr.ecr.us-east-1.amazonaws.com/dockerzon/nginx:latest
+● Replace my AccountId (xxx) with yours
+
+Push the nginx image to your repository
+docker push xxx.dkr.ecr.us-east-1.amazonaws.com/dockerzon/nginx
+● Replace my AccountId (xxx) with yours
+
