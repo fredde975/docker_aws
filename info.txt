@@ -40,7 +40,7 @@ Hur får man sedan att dem att exekvera i olika miljöer? Tex i produktion ska p
 Private Docker Registry (ECR)
 ================================
 Authenticate your Docker client to Amazon ECR
-aws --profile op ecr get-login
+aws --profile op ecr get-login  --no-include-email
 ● Copy/paste the output into a terminal to authenticate yourself for 12 hours
 
 ● Make a note of your registry URL for later
@@ -2270,7 +2270,13 @@ För att uppdatera en image, tex nginx:
 1. bygg nginx
 2. tag image med latest
 
-Updating nginx
+
+L54 automating deployments
+==========================
+
+
+
+LXX. Updating nginx
 ==============
 1. Build the new nginx Docker image
 # Make sure you're in the nginx/ folder when executing this command
