@@ -1,9 +1,32 @@
 Resources:
+ECR: 000986988155.dkr.ecr.eu-west-1.amazonaws.com
 "GroupId": "sg-bf4748c4"
 Postgres pwd: intergalacticzebramoldfactory
 Postgress endpoint": "dockerzon-production.cbjor7hidfop.eu-west-1.rds.amazonaws.com"
 redis endpoint: dockerzon-production.az5tzi.0001.euw1.cache.amazonaws.com
-ELB DNS:              "DNSName": "dockerzon-web-803630894.eu-west-1.elb.amazonaws.com"
+ELB DNS:  "dockerzon-web-803630894.eu-west-1.elb.amazonaws.com"
+the Application: http://dockerzon-web-803630894.eu-west-1.elb.amazonaws.com/
+
+
+$ aws --profile op  ecr describe-repositories
+{
+    "repositories": [
+        {
+            "registryId": "000986988155",
+            "repositoryName": "dockerzon/dockerzon",
+            "repositoryArn": "arn:aws:ecr:eu-west-1:000986988155:repository/dockerzon/dockerzon",
+            "createdAt": 1516552899.0,
+            "repositoryUri": "000986988155.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/dockerzon"
+        },
+        {
+            "registryId": "000986988155",
+            "repositoryName": "dockerzon/nginx",
+            "repositoryArn": "arn:aws:ecr:eu-west-1:000986988155:repository/dockerzon/nginx",
+            "createdAt": 1516565419.0,
+            "repositoryUri": "000986988155.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/nginx"
+        }
+    ]
+}
 
 
 
@@ -17,15 +40,16 @@ Hur får man sedan att dem att exekvera i olika miljöer? Tex i produktion ska p
 Private Docker Registry (ECR)
 ================================
 Authenticate your Docker client to Amazon ECR
-aws ecr get-login
+aws --profile op ecr get-login
 ● Copy/paste the output into a terminal to authenticate yourself for 12 hours
+
 ● Make a note of your registry URL for later
 Create a new repository
-aws ecr create-repository --repository-name deepdive/nginx
+aws  --profile op ecr create-repository --repository-name deepdive/nginx
 Describe all repositories
-aws ecr describe-repositories
+aws  --profile op ecr describe-repositories
 List all images in the deepdive/nginx repository
-aws ecr list-images --repository-name deepdive/nginx
+aws  --profile op ecr list-images --repository-name deepdive/nginx
 Pull down the nginx image so we can push it later
 docker pull nginx:1.9
 Tag the nginx image
@@ -1782,35 +1806,491 @@ Edit the copyecsconfigtos3
 
 Creating the Private Registry Repositories
 ==============================================
+ECR: 000986988155.dkr.ecr.eu-west-1.amazonaws.com
+
 Authenticate your docker client to Amazon ECR
-aws ecr get-login
+aws --profile op ecr get-login  --no-include-email
 ● Copy/paste the output into a terminal to authenticate yourself for 12 hours
 ● Make a note of your registry URL for later
 
 Create a dockerzon repository to house the Rails application
-aws ecr create-repository --repository-name dockerzon/dockerzon
+aws  --profile op ecr create-repository --repository-name dockerzon/dockerzon
 
 Create an nginx repository to house the custom version of nginx
-aws ecr create-repository --repository-name dockerzon/nginx
+aws  --profile op ecr create-repository --repository-name dockerzon/nginx
 
 Describe all repositories
-aws ecr describe-repositories
+aws  --profile op ecr describe-repositories
 
 Tag the Dockerzon image
 docker tag dockerzon_dockerzon:latest \
-xxx.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/dockerzon:latest
-● Replace my AccountId (xxx) with yours
+000986988155.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/dockerzon:latest
 
 Push the Dockerzon image to your repository
-docker push xxx.dkr.ecr.us-east-1.amazonaws.com/dockerzon/dockerzon
-● Replace my AccountId (xxx) with yours
+docker push 000986988155.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/dockerzon
 
 Tag the nginx image
 docker tag dockerzon_nginx:latest \
-xxx.dkr.ecr.us-east-1.amazonaws.com/dockerzon/nginx:latest
-● Replace my AccountId (xxx) with yours
+000986988155.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/nginx:latest
 
 Push the nginx image to your repository
-docker push xxx.dkr.ecr.us-east-1.amazonaws.com/dockerzon/nginx
-● Replace my AccountId (xxx) with yours
+docker push 000986988155.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/nginx
 
+
+
+L50 Create containers - Spinning up Multiple Container Instances
+=================================================================
+Create 3 EC2 instances
+# Make sure you're in the production/ folder when executing this command
+aws --profile op  ec2 run-instances --image-id ami-acb020d5 --count 3 \
+--instance-type t2.micro --iam-instance-profile Name=ecsInstanceRole \
+--key-name aws-fredrik-op --security-group-ids sg-bf4748c4 \
+--user-data file://copy-ecs-config-to-s3
+
+
+the ami-acb020d5  is the official Amazon ECS AMI for eu-west-1
+● We want the instance to use the ecsInstanceRole
+● Replace my ssh key name and security group with yours
+
+
+{
+    "Instances": [
+        {
+            "Monitoring": {
+                "State": "disabled"
+            },
+            "PublicDnsName": "",
+            "StateReason": {
+                "Message": "pending",
+                "Code": "pending"
+            },
+            "State": {
+                "Code": 0,
+                "Name": "pending"
+            },
+            "EbsOptimized": false,
+            "LaunchTime": "2018-01-21T20:29:29.000Z",
+            "PrivateIpAddress": "172.31.9.169",
+            "ProductCodes": [],
+            "VpcId": "vpc-7fb2741b",
+            "StateTransitionReason": "",
+            "InstanceId": "i-007697b3981593340",
+            "ImageId": "ami-acb020d5",
+            "PrivateDnsName": "ip-172-31-9-169.eu-west-1.compute.internal",
+            "KeyName": "aws-fredrik-op",
+            "SecurityGroups": [
+                {
+                    "GroupName": "fredrik_SG_euwest1",
+                    "GroupId": "sg-bf4748c4"
+                }
+            ],
+            "ClientToken": "",
+            "SubnetId": "subnet-6957fb0d",
+            "InstanceType": "t2.micro",
+            "NetworkInterfaces": [
+                {
+                    "Status": "in-use",
+                    "MacAddress": "02:5c:39:dc:ea:aa",
+                    "SourceDestCheck": true,
+                    "VpcId": "vpc-7fb2741b",
+                    "Description": "",
+                    "NetworkInterfaceId": "eni-3e751a10",
+                    "PrivateIpAddresses": [
+                        {
+                            "PrivateDnsName": "ip-172-31-9-169.eu-west-1.compute.internal",
+                            "Primary": true,
+                            "PrivateIpAddress": "172.31.9.169"
+                        }
+                    ],
+                    "PrivateDnsName": "ip-172-31-9-169.eu-west-1.compute.internal",
+                    "Attachment": {
+                        "Status": "attaching",
+                        "DeviceIndex": 0,
+                        "DeleteOnTermination": true,
+                        "AttachmentId": "eni-attach-4587ae27",
+                        "AttachTime": "2018-01-21T20:29:29.000Z"
+                    },
+                    "Groups": [
+                        {
+                            "GroupName": "fredrik_SG_euwest1",
+                            "GroupId": "sg-bf4748c4"
+                        }
+                    ],
+                    "Ipv6Addresses": [],
+                    "OwnerId": "000986988155",
+                    "SubnetId": "subnet-6957fb0d",
+                    "PrivateIpAddress": "172.31.9.169"
+                }
+            ],
+            "SourceDestCheck": true,
+            "Placement": {
+                "Tenancy": "default",
+                "GroupName": "",
+                "AvailabilityZone": "eu-west-1b"
+            },
+            "Hypervisor": "xen",
+            "BlockDeviceMappings": [],
+            "Architecture": "x86_64",
+            "RootDeviceType": "ebs",
+            "IamInstanceProfile": {
+                "Id": "AIPAI3ILWQ74LA2BE6J5G",
+                "Arn": "arn:aws:iam::000986988155:instance-profile/ecsInstanceRole"
+            },
+            "RootDeviceName": "/dev/xvda",
+            "VirtualizationType": "hvm",
+            "AmiLaunchIndex": 1
+        },
+        {
+            "Monitoring": {
+                "State": "disabled"
+            },
+            "PublicDnsName": "",
+            "StateReason": {
+                "Message": "pending",
+                "Code": "pending"
+            },
+            "State": {
+                "Code": 0,
+                "Name": "pending"
+            },
+            "EbsOptimized": false,
+            "LaunchTime": "2018-01-21T20:29:29.000Z",
+            "PrivateIpAddress": "172.31.5.212",
+            "ProductCodes": [],
+            "VpcId": "vpc-7fb2741b",
+            "StateTransitionReason": "",
+            "InstanceId": "i-0f8b02c1ebbee92d5",
+            "ImageId": "ami-acb020d5",
+            "PrivateDnsName": "ip-172-31-5-212.eu-west-1.compute.internal",
+            "KeyName": "aws-fredrik-op",
+            "SecurityGroups": [
+                {
+                    "GroupName": "fredrik_SG_euwest1",
+                    "GroupId": "sg-bf4748c4"
+                }
+            ],
+            "ClientToken": "",
+            "SubnetId": "subnet-6957fb0d",
+            "InstanceType": "t2.micro",
+            "NetworkInterfaces": [
+                {
+                    "Status": "in-use",
+                    "MacAddress": "02:66:d5:6b:24:68",
+                    "SourceDestCheck": true,
+                    "VpcId": "vpc-7fb2741b",
+                    "Description": "",
+                    "NetworkInterfaceId": "eni-21751a0f",
+                    "PrivateIpAddresses": [
+                        {
+                            "PrivateDnsName": "ip-172-31-5-212.eu-west-1.compute.internal",
+                            "Primary": true,
+                            "PrivateIpAddress": "172.31.5.212"
+                        }
+                    ],
+                    "PrivateDnsName": "ip-172-31-5-212.eu-west-1.compute.internal",
+                    "Attachment": {
+                        "Status": "attaching",
+                        "DeviceIndex": 0,
+                        "DeleteOnTermination": true,
+                        "AttachmentId": "eni-attach-4487ae26",
+                        "AttachTime": "2018-01-21T20:29:29.000Z"
+                    },
+                    "Groups": [
+                        {
+                            "GroupName": "fredrik_SG_euwest1",
+                            "GroupId": "sg-bf4748c4"
+                        }
+                    ],
+                    "Ipv6Addresses": [],
+                    "OwnerId": "000986988155",
+                    "SubnetId": "subnet-6957fb0d",
+                    "PrivateIpAddress": "172.31.5.212"
+                }
+            ],
+            "SourceDestCheck": true,
+            "Placement": {
+                "Tenancy": "default",
+                "GroupName": "",
+                "AvailabilityZone": "eu-west-1b"
+            },
+            "Hypervisor": "xen",
+            "BlockDeviceMappings": [],
+            "Architecture": "x86_64",
+            "RootDeviceType": "ebs",
+            "IamInstanceProfile": {
+                "Id": "AIPAI3ILWQ74LA2BE6J5G",
+                "Arn": "arn:aws:iam::000986988155:instance-profile/ecsInstanceRole"
+            },
+            "RootDeviceName": "/dev/xvda",
+            "VirtualizationType": "hvm",
+            "AmiLaunchIndex": 0
+        },
+        {
+            "Monitoring": {
+                "State": "disabled"
+            },
+            "PublicDnsName": "",
+            "StateReason": {
+                "Message": "pending",
+                "Code": "pending"
+            },
+            "State": {
+                "Code": 0,
+                "Name": "pending"
+            },
+            "EbsOptimized": false,
+            "LaunchTime": "2018-01-21T20:29:29.000Z",
+            "PrivateIpAddress": "172.31.15.159",
+            "ProductCodes": [],
+            "VpcId": "vpc-7fb2741b",
+            "StateTransitionReason": "",
+            "InstanceId": "i-0c96ac4e07f886cf0",
+            "ImageId": "ami-acb020d5",
+            "PrivateDnsName": "ip-172-31-15-159.eu-west-1.compute.internal",
+            "KeyName": "aws-fredrik-op",
+            "SecurityGroups": [
+                {
+                    "GroupName": "fredrik_SG_euwest1",
+                    "GroupId": "sg-bf4748c4"
+                }
+            ],
+            "ClientToken": "",
+            "SubnetId": "subnet-6957fb0d",
+            "InstanceType": "t2.micro",
+            "NetworkInterfaces": [
+                {
+                    "Status": "in-use",
+                    "MacAddress": "02:36:9e:1e:8c:70",
+                    "SourceDestCheck": true,
+                    "VpcId": "vpc-7fb2741b",
+                    "Description": "",
+                    "NetworkInterfaceId": "eni-20751a0e",
+                    "PrivateIpAddresses": [
+                        {
+                            "PrivateDnsName": "ip-172-31-15-159.eu-west-1.compute.internal",
+                            "Primary": true,
+                            "PrivateIpAddress": "172.31.15.159"
+                        }
+                    ],
+                    "PrivateDnsName": "ip-172-31-15-159.eu-west-1.compute.internal",
+                    "Attachment": {
+                        "Status": "attaching",
+                        "DeviceIndex": 0,
+                        "DeleteOnTermination": true,
+                        "AttachmentId": "eni-attach-4287ae20",
+                        "AttachTime": "2018-01-21T20:29:29.000Z"
+                    },
+                    "Groups": [
+                        {
+                            "GroupName": "fredrik_SG_euwest1",
+                            "GroupId": "sg-bf4748c4"
+                        }
+                    ],
+                    "Ipv6Addresses": [],
+                    "OwnerId": "000986988155",
+                    "SubnetId": "subnet-6957fb0d",
+                    "PrivateIpAddress": "172.31.15.159"
+                }
+            ],
+            "SourceDestCheck": true,
+            "Placement": {
+                "Tenancy": "default",
+                "GroupName": "",
+                "AvailabilityZone": "eu-west-1b"
+            },
+            "Hypervisor": "xen",
+            "BlockDeviceMappings": [],
+            "Architecture": "x86_64",
+            "RootDeviceType": "ebs",
+            "IamInstanceProfile": {
+                "Id": "AIPAI3ILWQ74LA2BE6J5G",
+                "Arn": "arn:aws:iam::000986988155:instance-profile/ecsInstanceRole"
+            },
+            "RootDeviceName": "/dev/xvda",
+            "VirtualizationType": "hvm",
+            "AmiLaunchIndex": 2
+        }
+    ],
+    "ReservationId": "r-06231ef4531ffd21d",
+    "Groups": [],
+    "OwnerId": "000986988155"
+}
+
+
+
+Verify that the 3 instances joined the cluster
+● It will take a few minutes for them to join, so it's ok to see an empty result for a while
+
+$ aws --profile op  ecs list-container-instances --cluster production
+{
+    "containerInstanceArns": [
+        "arn:aws:ecs:eu-west-1:000986988155:container-instance/bf36e980-f127-45df-9f66-41a3662a8404",
+        "arn:aws:ecs:eu-west-1:000986988155:container-instance/cb27b42d-3dec-4d56-9a90-638dc970a6cf",
+        "arn:aws:ecs:eu-west-1:000986988155:container-instance/cf4cd691-24ba-4717-ba8c-a2948f133c96"
+    ]
+}
+
+
+L51  Registering the Task Definitions
+======================================
+ECR: 000986988155.dkr.ecr.eu-west-1.amazonaws.com
+
+
+ Generate a secure token
+    # Make sure you're in the dockerzon/ folder when executing this command
+    docker-compose up -d
+
+    # Generate a secret token with Rails
+    docker exec dockerzon_dockerzon_1 rake secret
+
+    # Ensure everything has stopped
+    docker-compose stop
+
+    ● Copy the secure token generated by the rake secret command
+    Register the sidekiq task definition that you downloaded
+
+    # Make sure you're in the production/ folder when executing this command
+    aws  --profile op ecs register-task-definition \
+    --cli-input-json file://worker-task-definition.json
+    Register the web task definition that you downloaded
+
+    # Make sure you're in the production/ folder when executing this command
+    aws  --profile op  ecs register-task-definition \
+    --cli-input-json file://web-task-definition.json
+    Register the db reset task definition that you downloaded
+
+    # Make sure you're in the production/ folder when executing this command
+    aws  --profile op ecs register-task-definition \
+    --cli-input-json file://db-reset-task-definition.json
+    ● Make note of the revision in the JSON output --------------------------------------------------->  "revision": 1
+    Initialize the database with the reset task
+    aws  --profile op ecs run-task --cluster production --task-definition db-reset --count 1
+
+    Deregister the extremely dangerous reset task
+    aws  --profile op ecs deregister-task-definition --task-definition db-reset:1               <--------using revision 1 here!!!
+
+    ● Make sure to deregister the correct revision , and to deregister them all if more than 1 exists
+    Confirm that running the reset task is impossible
+    aws  --profile op ecs run-task --cluster production --task-definition db-reset --count 1
+
+    ● Make note of the TaskDefinition not found error in the JSON output (this is good!)
+    Register the db migrate task definition that you downloaded
+
+    # Make sure you're in the production/ folder when executing this command
+    aws  --profile op ecs register-task-definition \
+    --cli-input-json file://db-migrate-task-definition.json
+
+    Run a database migration with the migrate task
+    aws  --profile op ecs run-task --cluster production --task-definition db-migrate --count 1
+
+    List all task definitions
+    aws  --profile op ecs list-task-definitions
+    ● Make note of the web:x output in the JSON output
+
+
+    L52  Scheduling Services
+    =========================
+    Create the web service
+    # Make sure you're in the production/ folder when executing this command
+    aws  --profile op ecs create-service --cli-input-json file://web-service.json
+    ● It will take a few minutes before everything is running
+
+    Describe the web service
+    aws  --profile op ecs describe-services --cluster production --services web
+
+    Create the worker service
+    # Make sure you're in the production/ folder when executing this command
+    aws  --profile op ecs create-service --cli-input-json file://worker-service.json
+    ● It will take a few minutes before everything is running
+
+    Describe the worker service
+    aws  --profile op ecs describe-services --cluster production --services worker
+    View the web application in your browser
+    http://the_dns_name_of_your_load_balancer
+    ● Replace the_dns_name_of_your_load_balancer with your ELB's DNSName
+
+
+    Felsökning varför inte containrarna kör ordentligt:
+
+    docker ps -a -n 10
+
+
+    NGINX
+    -----
+    [ec2-user@ip-172-31-18-208 ~]$ docker logs -f 7a9f2cb6b3e4
+      % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                     Dload  Upload   Total   Spent    Left  Speed
+    100    49  100    49    0     0   9630      0 --:--:-- --:--:-- --:--:-- 12250
+    2018/01/27 14:28:13 [emerg] 1#1: could not build server_names_hash, you should increase server_names_hash_bucket_size: 64
+    nginx: [emerg] could not build server_names_hash, you should increase server_names_hash_bucket_size: 64
+
+    från nginx.conf:
+
+      # Avoid situations where a hostname is too long when dealing with vhosts.
+      server_names_hash_bucket_size 64; <----------------------------------------- pröva att kommentera bort denna
+      server_names_hash_max_size 512;
+
+
+
+    [ec2-user@ip-172-31-18-208 ~]$ docker logs -f fa4bf6d78ffb
+    [5] Puma starting in cluster mode...
+    [5] * Version 2.15.3 (ruby 2.3.6-p384), codename: Autumn Arbor Airbrush
+    [5] * Min threads: 1, max threads: 5
+    [5] * Environment: development
+    [5] * Process workers: 2
+    [5] * Preloading application
+    [5] * Listening on tcp://0.0.0.0:8000
+    [5] Use Ctrl-C to stop
+    [5] - Worker 0 (pid: 7) booted, phase: 0
+    [5] - Worker 1 (pid: 9) booted, phase: 0
+    [ec2-user@ip-172-31-18-208 ~]$
+
+
+
+    köra nginx containern
+    =====================
+-    efter att ha ssh:at in på en ec2 instans
+-    docker run  -it 000986988155.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/nginx bash
+
+Kan bla se:
+root@3281752ac0d5:/# ls -la
+-rwxrwxrwx   1 root root 1379 Jan 21 14:15 docker-entrypoint.sh
+
+försöker köra docker entrypoint men inget verkar hända....
+root@3281752ac0d5:/# ./docker-entrypoint.sh
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100    49  100    49    0     0  14223      0 --:--:-- --:--:-- --:--:-- 16333
+
+sätt variabler i docker miljön:
+export a=1
+
+
+För att uppdatera en image, tex nginx:
+1. bygg nginx
+2. tag image med latest
+
+Updating nginx
+==============
+1. Build the new nginx Docker image
+# Make sure you're in the nginx/ folder when executing this command
+docker build -t dockerzon_nginx .
+
+2. Tag the nginx image
+docker tag dockerzon_nginx:latest 000986988155.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/nginx:latest
+
+3. Push the nginx image to your repository
+docker push 000986988155.dkr.ecr.eu-west-1.amazonaws.com/dockerzon/nginx
+
+4.Register a new web task definition
+# Make sure you're in the production/ folder when executing this command
+aws --profile op ecs register-task-definition \
+--cli-input-json file://web-task-definition.json
+
+5. Update the web service
+aws --profile op ecs update-service --cluster production --service web \
+--task-definition web --desired-count 2
+
+View the app over HTTPS in your browser
+https://the_dns_name_of_your_load_balancer
+● Replace the_dns_name_of_your_load_balancer with your ELB's DNSName
