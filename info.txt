@@ -2273,8 +2273,39 @@ För att uppdatera en image, tex nginx:
 
 L54 automating deployments
 ==========================
+in the production folder:
+./deploy.sh -a
 
 
+L30 Running the application locally
+===================================
+in the dockerzon folder:
+docker-compose up -d
+
+När jag startat så kan jag editera tex. ett stylesheet och då ser jag uppdateringarna omgående i browsern
+http://localhost:8000
+
+Har då startat upp: postgres, redis, dockerzon, sidekiq
+
+Köra nginx lokal
+================
+1. ändra i docker-entrypoint.sh till PLACEHOLDER_VHOST = "localhost"
+
+2. bygg imagen från "ngnix" katalogen
+docker build -t dockerzon_nginx .
+
+3. starta applikationen från "dockerzon" katalogen
+docker-compose up -d
+
+
+4. kör imagen från "dockerzon" katalogen
+docker run  --rm -p 80:80 --net dockerzon_default dockerzon_nginx
+
+
+5. Prova att köra mot http://localhost
+Funkar men man får inga assets (dvs bilden) eftersom ngnix inte är uppsatt att köra mot dockerzon-volymen
+
+5.1 Återställ med att ändra tillbaka PLACEHOLDER_VHOST docker-entrypoint.sh
 
 LXX. Updating nginx
 ==============

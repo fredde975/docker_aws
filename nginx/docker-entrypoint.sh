@@ -17,7 +17,7 @@ PLACEHOLDER_BACKEND_PORT="8000"
 # metadata. This allows us to dynamically configure nginx at runtime.
 #
 # http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
-#PLACEHOLDER_VHOST="localhost"
+#PLACEHOLDER_VHOST="localhost" #set to localhost when using nginx locally
 PLACEHOLDER_VHOST="$(curl http://169.254.169.254/latest/meta-data/public-hostname)"
 
 # Where is our default config located?
