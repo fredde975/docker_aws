@@ -1,0 +1,111 @@
+ECR: 000986988155.dkr.ecr.us-east-1.amazonaws.com
+Security Group: sg-5db6112a
+
+
+Skapa Security Group
+====================
+aws --profile op-us-east-1 ec2 create-security-group --group-name fredrik_SG_us-east-1 --description "Security Group for Fredrik on us-east-1"
+
+aws --profile op-us-east-1 ec2 authorize-security-group-ingress --group-id sg-5db6112a --protocol tcp --port 5432 --cidr 0.0.0.0/0 --source-group sg-5db6112a
+aws --profile op-us-east-1 ec2 authorize-security-group-ingress --group-id sg-5db6112a --protocol tcp --port 22 --cidr 0.0.0.0/0
+aws --profile op-us-east-1 ec2 authorize-security-group-ingress --group-id sg-5db6112a --protocol tcp --port 80 --cidr 0.0.0.0/0
+aws --profile op-us-east-1 ec2 authorize-security-group-ingress --group-id sg-5db6112a --protocol tcp --port 6379 --cidr 0.0.0.0/0 --source-group sg-5db6112a
+
+
+
+Skapa s3
+========
+aws --profile op-us-east-1  s3api create-bucket --bucket fredrik-deepdive
+
+
+
+Skapa Redis
+===========
+aws --profile op-us-east-1 elasticache create-cache-cluster --engine redis \
+> --security-group-ids sg-5db6112a --cache-node-type cache.t2.micro \
+> --num-cache-nodes 1 --cache-cluster-id dockerzon-production
+
+
+
+Skapa RDS
+=========
+aws --profile op-us-east-1 rds create-db-instance --engine postgres \
+> --no-multi-az --no-publicly-accessible \
+> --vpc-security-group-ids sg-5db6112a \
+> --db-instance-class db.t2.micro --allocated-storage 20 \
+> --db-instance-identifier dockerzon-production \
+> --db-name dockerzon_production --master-username dockerzon \
+> --master-user-password intergalacticzebramoldfactory
+
+
+
+Create the fargate cluster
+==========================
+aws --profile op-us-east-1 ecs create-cluster --cluster-name production
+
+{
+    "cluster": {
+        "status": "ACTIVE",
+        "statistics": [],
+        "clusterName": "production",
+        "registeredContainerInstancesCount": 0,
+        "pendingTasksCount": 0,
+        "runningTasksCount": 0,
+        "activeServicesCount": 0,
+        "clusterArn": "arn:aws:ecs:us-east-1:000986988155:cluster/production"
+    }
+}
+
+
+Creating the Private Registry Repositories
+==============================================
+Authenticate your docker client to Amazon ECR
+aws --profile op-us-east-1 ecr get-login  --no-include-email
+● Copy/paste the output into a terminal to authenticate yourself for 12 hours
+● Make a note of your registry URL for later
+
+Create a dockerzon repository to house the Rails application
+aws  --profile op-us-east-1 ecr create-repository --repository-name dockerzon/dockerzon
+
+Create an nginx repository to house the custom version of nginx
+aws  --profile op-us-east-1 ecr create-repository --repository-name dockerzon/nginx
+
+Describe all repositories
+aws  --profile op-us-east-1 ecr describe-repositories
+
+{
+    "repositories": [
+        {
+            "registryId": "000986988155",
+            "repositoryName": "dockerzon/nginx",
+            "repositoryArn": "arn:aws:ecr:us-east-1:000986988155:repository/dockerzon/nginx",
+            "createdAt": 1517431568.0,
+            "repositoryUri": "000986988155.dkr.ecr.us-east-1.amazonaws.com/dockerzon/nginx"
+        },
+        {
+            "registryId": "000986988155",
+            "repositoryName": "dockerzon/dockerzon",
+            "repositoryArn": "arn:aws:ecr:us-east-1:000986988155:repository/dockerzon/dockerzon",
+            "createdAt": 1517431554.0,
+            "repositoryUri": "000986988155.dkr.ecr.us-east-1.amazonaws.com/dockerzon/dockerzon"
+        }
+    ]
+}
+
+Tag the Dockerzon image
+docker tag dockerzon_dockerzon:latest \
+000986988155.dkr.ecr.us-east-1.amazonaws.com/dockerzon/dockerzon:latest
+
+Push the Dockerzon image to your repository
+docker push 000986988155.dkr.ecr.us-east-1.amazonaws.com/dockerzon/dockerzon
+
+Tag the nginx image
+docker tag dockerzon_nginx:latest \
+000986988155.dkr.ecr.us-east-1.amazonaws.com/dockerzon/nginx:latest
+
+Push the nginx image to your repository
+docker push 000986988155.dkr.ecr.us-east-1.amazonaws.com/dockerzon/nginx
+
+
+
+aws ecs register-task-definition --cli-input-json file://$HOME/tasks/fargate-task.json
