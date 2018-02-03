@@ -1,6 +1,9 @@
-ECR: 000986988155.dkr.ecr.us-east-1.amazonaws.com
+ECR:            000986988155.dkr.ecr.us-east-1.amazonaws.com
 Security Group: sg-5db6112a
-
+CacheClusterId: dockerzon-production
+S3 bucket:      fredrik-dockerzon
+redis endpoint: dockerzon-production.hducee.0001.use1.cache.amazonaws.com
+RDS endpoint:   dockerzon-production.cdtpshxtupsx.us-east-1.rds.amazonaws.com
 
 Skapa Security Group
 ====================
@@ -15,28 +18,29 @@ aws --profile op-us-east-1 ec2 authorize-security-group-ingress --group-id sg-5d
 
 Skapa s3
 ========
-aws --profile op-us-east-1  s3api create-bucket --bucket fredrik-deepdive
-
+aws --profile op-us-east-1  s3api create-bucket --bucket fredrik-dockerzon
+An error occurred (BucketAlreadyOwnedByYou) when calling the CreateBucket operation: Your previous request to create the named bucket succeeded and you already own it.
 
 
 Skapa Redis
 ===========
 aws --profile op-us-east-1 elasticache create-cache-cluster --engine redis \
-> --security-group-ids sg-5db6112a --cache-node-type cache.t2.micro \
-> --num-cache-nodes 1 --cache-cluster-id dockerzon-production
+ --security-group-ids sg-5db6112a --cache-node-type cache.t2.micro \
+ --num-cache-nodes 1 --cache-cluster-id dockerzon-production
 
 
 
 Skapa RDS
 =========
 aws --profile op-us-east-1 rds create-db-instance --engine postgres \
-> --no-multi-az --no-publicly-accessible \
-> --vpc-security-group-ids sg-5db6112a \
-> --db-instance-class db.t2.micro --allocated-storage 20 \
-> --db-instance-identifier dockerzon-production \
-> --db-name dockerzon_production --master-username dockerzon \
-> --master-user-password intergalacticzebramoldfactory
+ --no-multi-az --no-publicly-accessible \
+ --vpc-security-group-ids sg-5db6112a \
+ --db-instance-class db.t2.micro --allocated-storage 20 \
+ --db-instance-identifier dockerzon-production \
+ --db-name dockerzon_production --master-username dockerzon \
+ --master-user-password intergalacticzebramoldfactory
 
+arn:aws:rds:us-east-1:000986988155:db:dockerzon-production
 
 
 Create the fargate cluster

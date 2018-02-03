@@ -1531,8 +1531,8 @@ $ aws --profile op rds create-db-instance --engine postgres \
 REDIS
 =====
 $ aws --profile op elasticache create-cache-cluster --engine redis \
-> --security-group-ids sg-bf4748c4 --cache-node-type cache.t2.micro \
-> --num-cache-nodes 1 --cache-cluster-id dockerzon-production
+ --security-group-ids sg-bf4748c4 --cache-node-type cache.t2.micro \
+ --num-cache-nodes 1 --cache-cluster-id dockerzon-production
 {
     "CacheCluster": {
         "Engine": "redis",
