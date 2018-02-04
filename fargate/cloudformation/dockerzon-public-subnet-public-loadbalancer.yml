@@ -34,11 +34,33 @@ Parameters:
     Type: Number
     Default: 2
     Description: How many copies of the service task to run
+
+  TaskRoleArn:
+    Type: String
+    Default: ''
+    Description: Role to be able to use ECR as image registry
+
+  ExecutionRoleArn:
+    Type: String
+    Default: ''
+    Description: Role to be able to use ECR as image registry
+
   Role:
     Type: String
     Default: ""
     Description: (Optional) An IAM role to give the service containers if they need to
                  access other AWS resources like S3 buckets, DynamoDB tables, etc
+
+  RedisEndpoint:
+    Type: String
+    Default: ""
+    Description: The Redis cache
+
+  RDSEndpoint:
+    Type: String
+    Default: ""
+    Description: The Postgres cache
+
 
 Conditions:
   HasCustomRole: !Not [ !Equals [!Ref 'Role', ''] ]
@@ -54,6 +76,8 @@ Resources:
       Cpu: 256
       Memory: 512
       NetworkMode: awsvpc
+      ExecutionRoleArn: !Ref 'ExecutionRoleArn'
+      #arn:aws:iam::000986988155:role/ecsTaskExecutionRole
       RequiresCompatibilities:
         - FARGATE
       ContainerDefinitions:
